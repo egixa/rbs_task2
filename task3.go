@@ -11,12 +11,16 @@ import (
 )
 
 func formatSize(size int64) string {
-	if size > 1<<30 {
-		return fmt.Sprintf("%.2f гб", float64(size)/(1<<30))
-	} else if size > 1<<20 {
-		return fmt.Sprintf("%.2f мб", float64(size)/(1<<20))
-	} else if size > 1<<10 {
-		return fmt.Sprintf("%.2f кб", float64(size)/(1<<10))
+	const gigabyte = 1000 * 1000 * 1000
+	const megabyte = 1000 * 1000
+	const kilobyte = 1000
+
+	if size > gigabyte {
+		return fmt.Sprintf("%.2f гб", float64(size)/(gigabyte))
+	} else if size > megabyte {
+		return fmt.Sprintf("%.2f мб", float64(size)/(megabyte))
+	} else if size > kilobyte {
+		return fmt.Sprintf("%.2f кб", float64(size)/(kilobyte))
 	}
 	return fmt.Sprintf("%d б", size)
 }
@@ -29,21 +33,6 @@ type File struct {
 
 type Files []*File
 
-func (f Files) Len() int      { return len(f) }
-func (f Files) Swap(i, j int) { f[i], f[j] = f[j], f[i] }
-
-type sortAsk struct{ Files }
-
-func (s sortAsk) Less(i, j int) bool {
-	return s.Files[i].Size < s.Files[j].Size
-}
-
-type sortDesc struct{ Files }
-
-func (s sortDesc) Less(i, j int) bool {
-	return s.Files[i].Size > s.Files[j].Size
-}
-
 func dirSize(path string) (int64, error) {
 
 	var size int64
@@ -52,10 +41,7 @@ func dirSize(path string) (int64, error) {
 			fmt.Println("Ошибка при обходе директории:", err)
 			return err
 		}
-
-		if !info.IsDir() {
-			size += info.Size()
-		}
+		size += info.Size()
 		return nil
 	})
 	return size, err
@@ -65,7 +51,7 @@ func main() {
 	start := time.Now()
 
 	rootFolder := flag.String("root", "", "Путь до директории для вывода структуры\n")
-	sortOptin := flag.String("sort", "desc", "Параметр сортировки:\n по убыванию -\n по возрастанию -")
+	sortOptin := flag.String("sort", "asc", "Параметр сортировки:\n по убыванию -\n по возрастанию -")
 	flag.Parse()
 
 	if *rootFolder == "" {
@@ -73,6 +59,11 @@ func main() {
 		fmt.Println("Ожидаемые параметры вызова программы:")
 		flag.PrintDefaults()
 		return
+	}
+
+	if *sortOptin != "asc" && *sortOptin != "desc" {
+		*sortOptin = "asc"
+		fmt.Println("Введен некорректный параметр сортировки. По умолчанию будет использована сортировка по возрастанию.")
 	}
 
 	_, err := os.Stat(*rootFolder)
@@ -122,13 +113,14 @@ func main() {
 	switch *sortOptin {
 	case "desc":
 		sort.Slice(s, func(i, j int) (less bool) {
-			return s[i].Name < s[j].Name
+			return s[i].Size > s[j].Size
 		})
 	case "asc":
 		sort.Slice(s, func(i, j int) (less bool) {
-			return s[i].Name < s[j].Name
+			return s[i].Size < s[j].Size
 		})
 	}
+
 	for _, file := range s {
 		fmt.Printf("%s %s Размер: %s\n", file.Type, file.Name, formatSize(file.Size))
 	}
