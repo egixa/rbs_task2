@@ -5,30 +5,44 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"time"
 )
 
-/*
-	func dirWalk(files []fs.FileInfo) {
-		for _, file := range files {
-			if file.IsDir() == true {
-				filepath.Walk("./"+file.Name(), func(wPath string, info os.FileInfo, err error) error {
-
-					return
-				})
-
-				continue
-			} else {
-				fmt.Println("Файл -", file.Name(), "Размер -", file.Size())
-				continue
-			}
-
-		}
+func formatSize(size int64) string {
+	if size > 1<<30 {
+		return fmt.Sprintf("%.2f гб", float64(size)/(1<<30))
+	} else if size > 1<<20 {
+		return fmt.Sprintf("%.2f мб", float64(size)/(1<<20))
+	} else if size > 1<<10 {
+		return fmt.Sprintf("%.2f кб", float64(size)/(1<<10))
 	}
-func sortFolder(sortOptin *string, files []) []{
+	return fmt.Sprintf("%d б", size)
+}
 
-}*/
+type File struct {
+	Type string
+	Name string
+	Size int64
+}
+
+type Files []*File
+
+func (f Files) Len() int      { return len(f) }
+func (f Files) Swap(i, j int) { f[i], f[j] = f[j], f[i] }
+
+type sortAsk struct{ Files }
+
+func (s sortAsk) Less(i, j int) bool {
+	return s.Files[i].Size < s.Files[j].Size
+}
+
+type sortDesc struct{ Files }
+
+func (s sortDesc) Less(i, j int) bool {
+	return s.Files[i].Size > s.Files[j].Size
+}
 
 func dirSize(path string) (int64, error) {
 
@@ -84,24 +98,41 @@ func main() {
 		return
 	}
 
+	s := []File{}
+
 	// Выводим имена файлов и директорий
 	for _, file := range files {
-		filePath := filepath.Join(*rootFolder, file.Name())
+		filename := file.Name()
+		fileSize := file.Size()
+		filePath := filepath.Join(*rootFolder, filename)
 
 		if file.IsDir() {
 			dirSize, err := dirSize(filePath)
 			if err != nil {
 				return
 			}
-			fmt.Println("Директория -", file.Name(), "Размер -", dirSize)
+			s = append(s, File{"Директория", filename, dirSize})
 			continue
 		} else {
-			fmt.Println("Файл -", file.Name(), "Размер -", file.Size())
+			s = append(s, File{"Файл", filename, fileSize})
 			continue
 		}
+	}
 
+	switch *sortOptin {
+	case "desc":
+		sort.Slice(s, func(i, j int) (less bool) {
+			return s[i].Name < s[j].Name
+		})
+	case "asc":
+		sort.Slice(s, func(i, j int) (less bool) {
+			return s[i].Name < s[j].Name
+		})
+	}
+	for _, file := range s {
+		fmt.Printf("%s %s Размер: %s\n", file.Type, file.Name, formatSize(file.Size))
 	}
 
 	duration := time.Since(start)
-	fmt.Println(duration, sortOptin)
+	fmt.Println(duration)
 }
